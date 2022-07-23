@@ -3,12 +3,12 @@
 #if defined( WINDOWS ) || defined( USE_WINDOWS ) || defined( WIN32 ) || defined( WIN64 ) || \
 	defined( _WIN32 ) || defined( _WIN64 )
 #ifdef TCC
-#include <winsock2.h> 
+#include <winsock2.h>
 #endif
 #ifndef strdup
 #define strdup _strdup
 #endif
-#endif 
+#endif
 
 #include "color.h"
 #include "configs.h"
@@ -307,6 +307,7 @@ void RegisterConstructorFunctions()
 	// Video Stuff
 	REGISTERnull();
 	REGISTERDisplayArray();
+	REGISTERDisplaySerial();
 	// REGISTERDisplayDMX();
 	// REGISTERDisplayFileWrite();
 	REGISTERDisplayHIDAPI();
@@ -623,7 +624,7 @@ int main( int argc, char **argv )
 		{
 			SecToWait = cpu_autolimit_interval - ( ThisTime - LastFrameTime );
 			LastFrameTime += cpu_autolimit_interval;
-			if ( SecToWait < -.1 ) LastFrameTime = ThisTime - .1;
+			if ( SecToWait < -.1 ) LastFrameTime = ThisTime - .0;
 			if ( SecToWait > 0 ) OGUSleep( (int)( SecToWait * 1000000 ) );
 		}
 
