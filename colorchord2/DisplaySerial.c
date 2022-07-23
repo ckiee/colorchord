@@ -10,6 +10,7 @@
 #include "color.h"
 #include <unistd.h>
 #include <fcntl.h>
+#include <stdbool.h>
 #include "CNFG.h"
 
 // note_amplitudes2[note] for how many lights to use.
@@ -20,33 +21,68 @@ struct DPODriver
 	int serial_port;
 };
 
+typedef struct DPONote {
+	bool valid;
+	float freq;
+	float amp;
+	float mult;
+	/* bool in_key; */
+} DPONote;
+
 
 static void DPOUpdate(void * id, struct NoteFinder*nf)
 {
 	int x,y;
 	struct DPODriver * d = (struct DPODriver*)id;
+	static DPONote notes[64];
+	static size_t note_count;
 
-	// How many notes exist? What's the average frequency?
-	int note_count = 0;
-	float notes_on = 0, notes_x = 0, notes_y = 0, freq_avg = 0;
-	for (int i = 0; nf->note_amplitudes_out[i]; i++) {
-		notes_on+=nf->note_amplitudes2[i];
-		printf("#%d(Freq %f, Amplit %f)\n", i, nf->frequencies[i], nf->note_amplitudes2[i]);
-		freq_avg += nf->frequencies[i];
-		note_count++;
+	float notes_x = 0, notes_y = 0;
+	for (int i = 0; i < nf->freqbins; i++) {
+		if (nf->note_amplitudes2[i]<0.01) continue;
+		DPONote null = {false};
+		DPONote *note = &null; // Don't ask. C is weird.
+		// find a matching note, if any
+		for (int j = 0; j < note_count; j++) {
+			/* printf("fdifff(%f,%f) : %f\n",nf->frequencies[i],notes[j].freq, fabsf(nf->frequencies[i] - notes[j].freq)); */
+			if (fabsf(nf->frequencies[i] - notes[j].freq) < 1.0) {
+				/* printf("%x(note) = &notes[%d]\n", note, j); */
+				note = &notes[j];
+				note->valid = true;
+				break;
+			}
+		}
+		if (!note->valid) {
+			// A new note
+			note = &notes[++note_count];
+			note->mult = 1.0;
+			note_count%=64;
+		}
+		note->freq = nf->frequencies[i];
+		float smoothing = 0.1;
+		note->amp = nf->note_amplitudes2[i] * (1-smoothing) + note->amp * smoothing;
+		note->mult = 1.0;
+		note->valid = true;
+		printf("Identify %d#(Freq %f : %f, Amplit %f)\n", i, nf->frequencies[i], note->freq, note->amp);
 	}
-	if (notes_on) freq_avg /= notes_on;
 	// Group notes into two bins. Kinda music theoryish, but idk music theory.
 	for (int i = 0; i < note_count; i++) {
-		float f = nf->frequencies[i];
-		if (!f) continue;
+		DPONote *note = &notes[i];
+		if (!note || !note->valid) continue;
+
+		char *names[12] = {"F\0\0","F#\0","G\0\0","G#\0","A\0\0","A#\0","B\0\0","C\0\0","C#\0","D\0\0","D#\0","E\0\0"};
+		float pabs_note = (12.0*(log2f(note->freq/440.0)+49.0))/12-2;
+		int pnote = abs((int)(12.0*(log2f(note->freq/440.0)+49.0))%12);
+		printf("Render %d#(%s %f, Amplit %f, Mult %f)\n", i, names[pnote], note->freq, note->amp, note->mult);
+		/* notes[i].multiplier -= 0.7 / nf->sps_rec; */
 		/* printf("CALCfmr\t\t\t= %d (%f)\n",); */
-		int note = (int)(12.0*(log2f(f/440.0)+49.0))%12;
 		// lol.. loll.. aaaaa ow
 		int key[12] = {1,1,0,1,0,1,0,1,1,0,1,0};
-		float final = nf->note_amplitudes[i]*100+900;
-		printf("key[%d] = %d\n", note, key[note]);
-		if (key[note]) notes_x+=final;
+		float mult_slope = 1.2;
+		float final = note->amp*100*(mult_slope/note->mult);
+		note->mult -= 10.0/63.0;
+		if (note->mult<0.01)note->valid=false;
+		if (key[pnote]) notes_x+=final;
 		else notes_y+=final;
 	}
 
@@ -55,6 +91,8 @@ static void DPOUpdate(void * id, struct NoteFinder*nf)
 	uint16_t serial_cmd_buf[3] = {/*P*/(l_ww>l_cw?l_ww:l_cw),/*WW*/l_ww,/*CW*/l_cw};
 	printf("%6d\t%6d\t%6d\n", serial_cmd_buf[0], serial_cmd_buf[1], serial_cmd_buf[2]);
 	write(d->serial_port, serial_cmd_buf, 3*2);
+
+}
 
 	/* static const size_t ringbuf_size = 512; */
 	/* static uint16_t intensity_ringbuf[512]; // prev frames for smoothing */
@@ -71,8 +109,6 @@ static void DPOUpdate(void * id, struct NoteFinder*nf)
 	/* 	printf("Wrap!\n"); */
 	/* } */
 	/* intensity_ringbuf[++ringbuf_pos] = smoothed; */
-}
-
 static void DPOParams(void * id )
 {
 	struct DPODriver * d = (struct DPODriver*)id;

@@ -613,7 +613,7 @@ int main( int argc, char **argv )
 		if ( ThisTime > LastFPSTime + 1 && showfps )
 		{
 #ifndef ANDROID
-			printf( "FPS: %d\n", frames );
+			/* printf( "FPS: %d\n", frames ); */
 #endif
 			lastfps = frames;
 			frames = 0;
