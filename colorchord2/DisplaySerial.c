@@ -86,8 +86,8 @@ static void DPOUpdate(void * id, struct NoteFinder*nf)
 		else notes_y+=final;
 	}
 
-	uint16_t l_ww = 500 + notes_x;
-	uint16_t l_cw = 500 + notes_y;
+	uint16_t l_ww = 5000 + notes_x;
+	uint16_t l_cw = 5000 + notes_y;
 	uint16_t serial_cmd_buf[3] = {/*P*/(l_ww>l_cw?l_ww:l_cw),/*WW*/l_ww,/*CW*/l_cw};
 	printf("%6d\t%6d\t%6d\n", serial_cmd_buf[0], serial_cmd_buf[1], serial_cmd_buf[2]);
 	write(d->serial_port, serial_cmd_buf, 3*2);
